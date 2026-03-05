@@ -7,8 +7,8 @@
 # Path to your Obsidian vault (required)
 vault_path: "/path/to/your/obsidian/vault"
 
-# Papers directory relative to vault (optional, default: 20_Research/Papers)
-papers_dir: "20_Research/Papers"
+# Papers directory relative to vault (optional, default: literature_research)
+papers_dir: "literature_research"
 
 research_domains:
   "Target Diseases & Traits":

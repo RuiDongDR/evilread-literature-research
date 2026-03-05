@@ -1,6 +1,8 @@
 # evilread-literature-research
 
-Automated research paper workflow — multi-source literature search, scoring, and Obsidian note generation, powered by [Claude Code](https://claude.ai/claude-code) skills.
+Automated research paper workflow — multi-source literature search, scoring, and Obsidian note generation.
+
+This repo is customized for my research interests and needs, inspired by the [original repo: evil-read-arxiv](https://github.com/juliye2025/evil-read-arxiv).
 
 ## What It Does
 
@@ -11,14 +13,6 @@ Runs a literature digest across arXiv, bioRxiv/medRxiv, and PubMed for a given d
 - **Moderate Priority** (5–7.5) — relevant but lower match
 - **Lower Priority** (3–5) — tangentially related
 - **New Publications by Priority Authors** — always surfaced regardless of score
-
-## Skills Included
-
-| Skill | Command | Description |
-|-------|---------|-------------|
-| `start-literature-research` | `/start-literature-research --start YYYYMMDD --end YYYYMMDD` | Literature digest for a date range |
-
----
 
 ## Setup (macOS)
 
@@ -36,7 +30,7 @@ curl -fsSL https://pixi.sh/install.sh | bash
 pixi install
 ```
 
-### 2. Install the skills into Claude Code
+### 2. Install the skills into Claude Code (if run as a prompt in Claude)
 
 First, find your Claude Code skills directory:
 
@@ -63,6 +57,7 @@ First, find your Obsidian vault location:
 
 ```bash
 # On macOS, vaults are typically under ~/Documents or ~/Library:
+ls ~/ | grep -i obsidian
 ls ~/Documents/ | grep -i obsidian
 
 # Or check Obsidian's config for all known vaults:
@@ -120,16 +115,17 @@ Manually set `<PATH_TO_YOUR_OBSIDIAN_VAULT>` before running (or skip the first l
 ```bash
 OBSIDIAN_VAULT_PATH="<PATH_TO_YOUR_OBSIDIAN_VAULT>"
 cd "$OBSIDIAN_VAULT_PATH"
-claude
+
 ```
 
 ---
 
 ## Usage
 
-### Literature search
+### Using Within Claude
 
 ```
+claude
 /start-literature-research --start 20260225 --end 20260304
 ```
 
@@ -139,6 +135,48 @@ Dates are `YYYYMMDD`, both inclusive. The note is saved to:
 $OBSIDIAN_VAULT_PATH/literature_research/20260225_20260304_literature_research.md
 ```
 
+### Using Outside of Claude
+
+All commands must be run from the repo root (where `pixi.toml` lives):
+
+```bash
+cd /path/to/evilread-literature-research
+OBSIDIAN_VAULT_PATH="<PATH_TO_YOUR_OBSIDIAN_VAULT>"
+START_DATE=20250611
+END_DATE=20250625
+```
+
+**Step 1 — Search papers and save results to JSON:**
+
+```bash
+pixi run python start-literature-research/scripts/search_papers.py \
+  --output /tmp/results.json \
+  --start ${START_DATE} --end ${END_DATE}
+```
+
+Optional flags for `search_papers.py`:
+
+```bash
+# arXiv + bioRxiv only, skip PubMed
+pixi run python start-literature-research/scripts/search_papers.py \
+  --output /tmp/results.json \
+  --start ${START_DATE} --end ${END_DATE} \
+  --skip-pubmed 
+
+# Use a custom config file
+pixi run python start-literature-research/scripts/search_papers.py \
+  --config /path/to/custom_config.yaml \
+  --output /tmp/results.json \
+  --start ${START_DATE} --end ${END_DATE}
+```
+
+**Step 2 — Generate the Obsidian note from the JSON:**
+
+```bash
+pixi run python start-literature-research/scripts/generate_note.py \
+  --input /tmp/results.json \
+  --output ${OBSIDIAN_VAULT_PATH}/literature_research/${START_DATE}_${END_DATE}_literature_research.md
+```
 
 ---
 
@@ -249,53 +287,6 @@ ls config.yaml   # must exist at the repo root
 
 ---
 
-## Run Without Claude
-
-All commands must be run from the repo root (where `pixi.toml` lives):
-
-```bash
-cd /path/to/evilread-literature-research
-OBSIDIAN_VAULT_PATH="<PATH_TO_YOUR_OBSIDIAN_VAULT>"
-START_DATE=20250611
-END_DATE=20250625
-```
-
-**Step 1 — Search papers and save results to JSON:**
-
-```bash
-pixi run python start-literature-research/scripts/search_papers.py \
-  --output /tmp/results.json \
-  --start ${START_DATE} --end ${END_DATE}
-```
-
-Optional flags for `search_papers.py`:
-
-```bash
-# arXiv + bioRxiv only, skip PubMed
-pixi run python start-literature-research/scripts/search_papers.py \
-  --output /tmp/results.json \
-  --start ${START_DATE} --end ${END_DATE} \
-  --skip-pubmed 
-
-# Use a custom config file
-pixi run python start-literature-research/scripts/search_papers.py \
-  --config /path/to/custom_config.yaml \
-  --output /tmp/results.json \
-  --start ${START_DATE} --end ${END_DATE}
-```
-
-**Step 2 — Generate the Obsidian note from the JSON:**
-
-```bash
-pixi run python start-literature-research/scripts/generate_note.py \
-  --input /tmp/results.json \
-  --output ${OBSIDIAN_VAULT_PATH}/literature_research/${START_DATE}_${END_DATE}_literature_research.md
-```
-
-The date range is read directly from the JSON — no need to pass it again.
-
----
-
 ## Acknowledgments
 
 - [arXiv](https://arxiv.org/) — open-access preprint platform
@@ -303,7 +294,8 @@ The date range is read directly from the JSON — no need to pass it again.
 - [PubMed](https://pubmed.ncbi.nlm.nih.gov/) — NCBI biomedical literature database
 - [Claude Code](https://claude.ai/claude-code) — AI-assisted development environment
 - [Obsidian](https://obsidian.md/) — knowledge management tool
-
+- [Original repo](https://github.com/juliye2025/evil-read-arxiv) - inspiration source
+ 
 ## License
 
 MIT License
