@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+usage() {
+  echo "Usage: $0 --start YYYYMMDD --end YYYYMMDD --output PATH/TO/NOTE.md"
+  exit 1
+}
+
+START_DATE=""
+END_DATE=""
+OUTPUT=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --start) START_DATE="$2"; shift 2 ;;
+    --end)   END_DATE="$2";   shift 2 ;;
+    --output) OUTPUT="$2";    shift 2 ;;
+    *) echo "Unknown argument: $1"; usage ;;
+  esac
+done
+
+[[ -z "$START_DATE" || -z "$END_DATE" || -z "$OUTPUT" ]] && usage
+
+TMP_RESULTS="$(mktemp /tmp/literature_results_XXXXXX.json)"
+trap 'rm -f "$TMP_RESULTS"' EXIT
+
+cd "$SCRIPT_DIR"
+
+pixi run python "$SCRIPT_DIR/start-literature-research/scripts/search_papers.py" \
+  --output "$TMP_RESULTS" \
+  --start "$START_DATE" --end "$END_DATE"
+
+mkdir -p "$(dirname "$OUTPUT")"
+
+pixi run python "$SCRIPT_DIR/start-literature-research/scripts/generate_note.py" \
+  --input "$TMP_RESULTS" \
+  --output "$OUTPUT"
+
+echo "Done: $OUTPUT"
