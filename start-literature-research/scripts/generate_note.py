@@ -5,9 +5,7 @@ Generate an Obsidian literature-research note from papers_results.json.
 Usage:
     python generate_note.py \
         --input /tmp/papers_results.json \
-        --output /path/to/vault/literature_research/YYYYMMDD_YYYYMMDD_literature_research.md \
-        --start YYYYMMDD \
-        --end YYYYMMDD
+        --output /path/to/vault/literature_research/YYYYMMDD_YYYYMMDD_literature_research.md
 """
 
 import argparse
@@ -57,7 +55,7 @@ def get_source(p: dict) -> str:
     elif source == "medrxiv":
         return "medRxiv"
     elif source == "pubmed" and journal:
-        return journal
+        return " ".join(w.capitalize() for w in journal.split())
     return source
 
 
@@ -194,8 +192,6 @@ def main():
     parser = argparse.ArgumentParser(description="Generate Obsidian literature note")
     parser.add_argument("--input", required=True, help="Path to papers_results.json")
     parser.add_argument("--output", required=True, help="Output .md path")
-    parser.add_argument("--start", required=True, help="Start date YYYYMMDD")
-    parser.add_argument("--end", required=True, help="End date YYYYMMDD")
     args = parser.parse_args()
 
     with open(args.input) as f:
@@ -209,19 +205,19 @@ def main():
     high = [p for p in _high_all if (p.get("scores", {}).get("recommendation", 0) or 0) < MUST_READ_CUTOFF]
     moderate = data.get("moderate_priority", [])
     low = data.get("low_priority", [])
-    author_papers = data.get("priority_author_papers", [])
 
-    # Format display dates
-    s = args.start
-    e = args.end
-    start_disp = f"{s[:4]}-{s[4:6]}-{s[6:]}"
-    end_disp = f"{e[:4]}-{e[4:6]}-{e[6:]}"
+    # Read dates from JSON
+    recent = data.get("date_windows", {}).get("recent", {})
+    s = recent.get("start", "")
+    e = recent.get("end", "")
+    start_disp = f"{s[:4]}-{s[4:6]}-{s[6:]}" if len(s) == 8 else s
+    end_disp = f"{e[:4]}-{e[4:6]}-{e[6:]}" if len(e) == 8 else e
 
     lines = []
     lines.append("---")
     lines.append('tags: ["literature-research"]')
-    lines.append(f"start_date: {args.start}")
-    lines.append(f"end_date: {args.end}")
+    lines.append(f"start_date: {s}")
+    lines.append(f"end_date: {e}")
     lines.append("---")
     lines.append("")
     lines.append("# Overview")
@@ -231,7 +227,7 @@ def main():
         f"({stats.get('arxiv', 0)} papers), bioRxiv/medRxiv ({stats.get('biorxiv', 0)} papers), "
         f"and PubMed ({stats.get('pubmed', 0)} papers). "
         f"Identified {len(must_read)} must-read, {len(high)} high-priority, "
-        f"{len(moderate)} moderate-priority, and {len(low)} lower-priority papers."
+        f"{len(moderate)} moderate-priority, and {len(low)} lower-priority papers across all sources."
     )
     lines.append("")
     lines.append("---")
@@ -278,36 +274,13 @@ def main():
         lines.append(make_entry(p, i))
         lines.append("")
 
-    lines.append("---")
-    lines.append("")
-
-    # Priority author papers
-    lines.append("# New Publications by Priority Authors")
-    lines.append("")
-    if author_papers:
-        for i, p in enumerate(author_papers, 1):
-            entry = make_entry(p, i)
-            # Add matched authors note
-            matched = p.get("matched_authors", [])
-            if matched:
-                entry = entry.replace(
-                    "- **Why selected:**",
-                    f"- **Why selected:** Paper by priority author(s): {', '.join(matched)} —",
-                )
-            lines.append(entry)
-            lines.append("")
-    else:
-        lines.append(
-            "*No publications by priority authors were identified in this date range.*"
-        )
-        lines.append("")
 
     content = "\n".join(lines)
     out_path = Path(args.output)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(content, encoding="utf-8")
     print(f"Note written to {out_path} ({len(content):,} chars, {content.count(chr(10))} lines)")
-    print(f"  Must-read: {len(must_read)}, High: {len(high)}, Moderate: {len(moderate)}, Low: {len(low)}, Author: {len(author_papers)}")
+    print(f"  Must-read: {len(must_read)}, High: {len(high)}, Moderate: {len(moderate)}, Low: {len(low)}")
 
 
 if __name__ == "__main__":

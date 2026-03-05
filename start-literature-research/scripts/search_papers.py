@@ -7,7 +7,6 @@ Sources:
   2. bioRxiv / medRxiv — genetics, genomics, epidemiology preprints
   3. PubMed (journal sweep) — published papers in target journals
   4. PubMed (author sweep) — papers by priority authors
-  5. Semantic Scholar — high-citation papers (optional, off by default)
 """
 
 import xml.etree.ElementTree as ET
@@ -39,12 +38,6 @@ ARXIV_NS = {
     'atom': 'http://www.w3.org/2005/Atom',
     'arxiv': 'http://arxiv.org/schemas/atom',
 }
-
-SEMANTIC_SCHOLAR_API_URL = "https://api.semanticscholar.org/graph/v1/paper/search"
-SEMANTIC_SCHOLAR_FIELDS = (
-    "title,abstract,publicationDate,citationCount,"
-    "influentialCitationCount,url,authors,externalIds"
-)
 
 PUBMED_BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 BIORXIV_BASE_URL = "https://api.biorxiv.org/details"
@@ -98,10 +91,6 @@ RECENCY_DEFAULT = 0.0
 POPULARITY_INFLUENTIAL_CITATION_FULL_SCORE = 100
 
 WEIGHTS_NORMAL = {'relevance': 0.40, 'recency': 0.20, 'popularity': 0.30, 'quality': 0.10}
-WEIGHTS_HOT    = {'relevance': 0.35, 'recency': 0.10, 'popularity': 0.45, 'quality': 0.10}
-
-S2_RATE_LIMIT_WAIT        = 30
-S2_CATEGORY_REQUEST_INTERVAL = 3
 
 # Recommendation-score thresholds
 THRESHOLD_HIGH     = 7.5
@@ -351,29 +340,55 @@ def _build_journal_filter(journals: List[str]) -> str:
     return '(' + ' OR '.join(parts) + ')'
 
 
+# Name particles that form part of a compound surname
+_NAME_PARTICLES = {"de", "van", "von", "le", "la", "du", "den", "der", "ten", "ter", "al"}
+
+def _split_author_name(full_name: str):
+    """Split a full name into (first_parts, last) handling compound surnames.
+
+    Examples:
+      "Philip De Jager"  → (["Philip"], "De Jager")
+      "Alkes L Price"    → (["Alkes", "L"], "Price")
+      "Matthew Stephens" → (["Matthew"], "Stephens")
+    """
+    parts = full_name.strip().split()
+    if len(parts) < 2:
+        return parts, ""
+    # Walk backwards: collect trailing tokens that are particles or the final token
+    last_parts = [parts[-1]]
+    i = len(parts) - 2
+    while i >= 1 and parts[i].lower() in _NAME_PARTICLES:
+        last_parts.insert(0, parts[i])
+        i -= 1
+    last = " ".join(last_parts)
+    first_parts = parts[:i + 1]
+    return first_parts, last
+
+
 def _build_author_filter(authors: List[str]) -> str:
     """Format priority author names for PubMed author query.
 
-    Each name generates two terms to handle middle-name variants:
-      "Alkes Price"       → "Price A"[Author]   (first initial only)
-      "Alkes L Price"     → "Price A"[Author] OR "Price AL"[Author]
-    Using OR of both ensures we catch "Price A", "Price AL", etc.
+    Handles compound surnames (De Jager, Van Duijn, etc.) by keeping
+    particles attached to the surname.
+
+    Examples:
+      "Philip De Jager"  → "De Jager P"[Author]
+      "Alkes Price"      → "Price A"[Author]
+      "Alkes L Price"    → "Price A"[Author] OR "Price AL"[Author]
     """
     terms = []
     for full_name in authors:
-        parts = full_name.strip().split()
-        if len(parts) >= 2:
-            last = parts[-1]
-            first_parts = parts[:-1]          # everything before last name
-            first_initial = first_parts[0][0] # first letter of first name
-            # Always add "Last F" (catches all variants)
-            terms.append(f'"{last} {first_initial}"[Author]')
-            # If there are middle names, also add "Last FM" initials
-            if len(first_parts) >= 2:
-                initials = ''.join(p[0] for p in first_parts)
-                terms.append(f'"{last} {initials}"[Author]')
-        else:
+        first_parts, last = _split_author_name(full_name)
+        if not last or not first_parts:
             terms.append(f'"{full_name}"[Author]')
+            continue
+        first_initial = first_parts[0][0]
+        # Always add "Last F" (catches all variants including middle initials)
+        terms.append(f'"{last} {first_initial}"[Author]')
+        # If there are additional name parts, also add full initials
+        if len(first_parts) >= 2:
+            initials = ''.join(p[0] for p in first_parts)
+            terms.append(f'"{last} {initials}"[Author]')
     return '(' + ' OR '.join(terms) + ')'
 
 
@@ -529,7 +544,7 @@ def search_pubmed_by_authors(
     authors: List[str],
     start_date: datetime,
     end_date: datetime,
-    max_results: int = 50,
+    max_results: int = 500,
 ) -> List[Dict]:
     """Search PubMed for papers by priority authors in the date range."""
     author_query = _build_author_filter(authors)
@@ -578,104 +593,6 @@ def search_pubmed_by_authors(
 
 
 # ===========================================================================
-# Semantic Scholar (optional hot papers)
-# ===========================================================================
-
-def search_semantic_scholar_hot_papers(
-    query: str,
-    start_date: datetime,
-    end_date: datetime,
-    top_k: int = 20,
-    max_retries: int = 3,
-) -> List[Dict]:
-    date_range = f"{start_date.strftime('%Y-%m-%d')}:{end_date.strftime('%Y-%m-%d')}"
-    params = {
-        "query": query,
-        "publicationDateOrYear": date_range,
-        "limit": 100,
-        "fields": SEMANTIC_SCHOLAR_FIELDS,
-    }
-    headers = {"User-Agent": "LiteratureResearch-PaperFetcher/2.0"}
-
-    logger.info("[S2] Hot papers %s to %s | query: '%s'", start_date.date(), end_date.date(), query)
-
-    for attempt in range(max_retries):
-        try:
-            if HAS_REQUESTS:
-                response = requests.get(
-                    SEMANTIC_SCHOLAR_API_URL, params=params, headers=headers, timeout=15
-                )
-                response.raise_for_status()
-                data = response.json()
-            else:
-                qs = urllib.parse.urlencode(params)
-                req = urllib.request.Request(f"{SEMANTIC_SCHOLAR_API_URL}?{qs}", headers=headers)
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    data = json.loads(resp.read().decode('utf-8'))
-
-            papers = data.get("data", [])
-            valid = []
-            for p in papers:
-                if not p.get("title") or not p.get("abstract"):
-                    continue
-                p["influentialCitationCount"] = p.get("influentialCitationCount") or 0
-                p["citationCount"]            = p.get("citationCount") or 0
-                p["source"]     = "semantic_scholar"
-                p["hot_score"]  = p["influentialCitationCount"]
-                # Normalise field names for downstream processing
-                p["abstract"]   = p.get("abstract", "")
-                author_objects  = p.get("authors", [])
-                p["authors"]    = [a.get("name", "") for a in author_objects]
-                p["arxiv_id"]   = (p.get("externalIds") or {}).get("ArXiv")
-                pub_str = p.get("publicationDate") or ""
-                try:
-                    p["published_date"] = datetime.strptime(pub_str, '%Y-%m-%d') if pub_str else None
-                except ValueError:
-                    p["published_date"] = None
-                valid.append(p)
-
-            valid.sort(key=lambda x: x["influentialCitationCount"], reverse=True)
-            logger.info("[S2] Found %d valid papers, returning top %d", len(valid), top_k)
-            return valid[:top_k]
-
-        except Exception as e:
-            err = str(e)
-            logger.warning("[S2] Error (attempt %d/%d): %s", attempt + 1, max_retries, e)
-            if attempt < max_retries - 1:
-                wait = S2_RATE_LIMIT_WAIT if ("429" in err or "Too Many Requests" in err) else (2 ** attempt) * 2
-                time.sleep(wait)
-
-    return []
-
-
-def search_hot_papers_from_categories(
-    categories: List[str],
-    start_date: datetime,
-    end_date: datetime,
-    top_k_per_category: int = 5,
-) -> List[Dict]:
-    all_hot: List[Dict] = []
-    seen_arxiv_ids: Set[str] = set()
-
-    for cat in categories:
-        query = ARXIV_CATEGORY_KEYWORDS.get(cat, cat)
-        papers = search_semantic_scholar_hot_papers(
-            query=query, start_date=start_date, end_date=end_date, top_k=top_k_per_category
-        )
-        for p in papers:
-            aid = p.get("arxiv_id")
-            if aid and aid in seen_arxiv_ids:
-                continue
-            if aid:
-                seen_arxiv_ids.add(aid)
-            all_hot.append(p)
-        time.sleep(S2_CATEGORY_REQUEST_INTERVAL)
-
-    all_hot.sort(key=lambda x: x.get("influentialCitationCount", 0), reverse=True)
-    return all_hot
-
-
-# ===========================================================================
 # Scoring
 # ===========================================================================
 
@@ -690,9 +607,9 @@ def _normalize_keywords(keywords_raw) -> Dict[str, List[str]]:
         return {'high': [], 'medium': [], 'low': keywords_raw}
     if isinstance(keywords_raw, dict):
         return {
-            'high':   keywords_raw.get('high', []),
-            'medium': keywords_raw.get('medium', []),
-            'low':    keywords_raw.get('low', []),
+            'high':   keywords_raw.get('high') or [],
+            'medium': keywords_raw.get('medium') or [],
+            'low':    keywords_raw.get('low') or [],
         }
     return {'high': [], 'medium': [], 'low': []}
 
@@ -803,13 +720,11 @@ def calculate_recommendation_score(
     recency: float,
     popularity: float,
     quality: float,
-    is_hot: bool = False,
 ) -> float:
     normalized = {k: (v / SCORE_MAX) * 10 for k, v in
                   [('relevance', relevance), ('recency', recency),
                    ('popularity', popularity), ('quality', quality)]}
-    weights = WEIGHTS_HOT if is_hot else WEIGHTS_NORMAL
-    return round(sum(normalized[k] * weights[k] for k in weights), 2)
+    return round(sum(normalized[k] * WEIGHTS_NORMAL[k] for k in WEIGHTS_NORMAL), 2)
 
 
 def _normalize_name(name: str) -> str:
@@ -864,7 +779,6 @@ def check_priority_author_match(paper: Dict, priority_authors: List[str]) -> Lis
 def filter_and_score_papers(
     papers: List[Dict],
     config: Dict,
-    is_hot_paper_batch: bool = False,
     end_date: Optional[datetime] = None,
     priority_authors: Optional[List[str]] = None,
 ) -> List[Dict]:
@@ -887,14 +801,10 @@ def filter_and_score_papers(
         recency = calculate_recency_score(pub_date, reference_date=end_date)
 
         # Popularity
-        if is_hot_paper_batch:
-            inf_cit = paper.get('influentialCitationCount', 0) or 0
-            popularity = min(inf_cit / (POPULARITY_INFLUENTIAL_CITATION_FULL_SCORE / SCORE_MAX), SCORE_MAX)
-        else:
-            popularity = calculate_quality_score(paper, config)
+        popularity = calculate_quality_score(paper, config)
 
         quality = calculate_quality_score(paper, config)
-        rec_score = calculate_recommendation_score(relevance, recency, popularity, quality, is_hot_paper_batch)
+        rec_score = calculate_recommendation_score(relevance, recency, popularity, quality)
 
         # Source boost: bioRxiv/medRxiv papers are biology-specific, so they are
         # inherently more on-topic than generic arXiv stat papers.
@@ -920,7 +830,6 @@ def filter_and_score_papers(
         paper['matched_domain']   = matched_domain
         paper['matched_keywords'] = matched_kws
         paper['matched_authors']  = matched_authors
-        paper['is_hot_paper']     = is_hot_paper_batch
         scored.append(paper)
 
     scored.sort(key=lambda x: x['scores']['recommendation'], reverse=True)
@@ -959,7 +868,7 @@ def deduplicate_papers(papers: List[Dict]) -> List[Dict]:
 # Within-section ordering: published journals first, then bioRxiv/medRxiv,
 # then arXiv; within each source group papers are ordered by score (desc).
 # ---------------------------------------------------------------------------
-_SOURCE_ORDER = {'pubmed': 0, 'biorxiv': 1, 'medrxiv': 1, 'arxiv': 2, 'semantic_scholar': 3}
+_SOURCE_ORDER = {'pubmed': 0, 'biorxiv': 1, 'medrxiv': 1, 'arxiv': 2}
 
 
 def sort_by_source_then_score(papers: List[Dict]) -> List[Dict]:
@@ -986,7 +895,7 @@ def main():
     default_config = str(_local) if _local.exists() else (str(_default) if _default.exists() else '')
 
     parser = argparse.ArgumentParser(
-        description='Multi-source paper search: arXiv, bioRxiv, PubMed, Semantic Scholar'
+        description='Multi-source paper search: arXiv, bioRxiv, PubMed'
     )
     parser.add_argument('--config', type=str, default=default_config or None,
                         help='Path to research_interests.yaml (or set OBSIDIAN_VAULT_PATH)')
@@ -1005,12 +914,6 @@ def main():
                         help='Skip bioRxiv/medRxiv search')
     parser.add_argument('--skip-pubmed', action='store_true',
                         help='Skip PubMed journal sweep')
-    parser.add_argument('--skip-author-search', action='store_true',
-                        help='Skip PubMed priority-author search')
-    parser.add_argument('--include-hot-papers', action='store_true',
-                        help='Include Semantic Scholar hot papers (off by default)')
-    parser.add_argument('--hot-lookback-days', type=int, default=60,
-                        help='Days to look back for Semantic Scholar hot papers')
 
     args = parser.parse_args()
 
@@ -1043,9 +946,8 @@ def main():
     pr_authors = config.get('priority_authors', [])
 
     all_scored: List[Dict] = []
-    priority_author_papers: List[Dict] = []
 
-    stats = {'arxiv': 0, 'biorxiv': 0, 'pubmed': 0, 'priority_authors': 0, 'semantic_scholar': 0}
+    stats = {'arxiv': 0, 'biorxiv': 0, 'pubmed': 0}
 
     # ── Step 1: arXiv ──────────────────────────────────────────────────────
     logger.info("=" * 70)
@@ -1060,7 +962,7 @@ def main():
     )
     if arxiv_papers:
         scored = filter_and_score_papers(
-            arxiv_papers, config, is_hot_paper_batch=False, end_date=end_date, priority_authors=pr_authors
+            arxiv_papers, config, end_date=end_date, priority_authors=pr_authors
         )
         stats['arxiv'] = len(scored)
         all_scored.extend(scored)
@@ -1076,7 +978,7 @@ def main():
         )
         if biorxiv_papers:
             scored = filter_and_score_papers(
-                biorxiv_papers, config, is_hot_paper_batch=False, end_date=end_date, priority_authors=pr_authors
+                biorxiv_papers, config, end_date=end_date, priority_authors=pr_authors
             )
             stats['biorxiv'] = len(scored)
             all_scored.extend(scored)
@@ -1106,7 +1008,7 @@ def main():
         )
         if pubmed_papers:
             scored = filter_and_score_papers(
-                pubmed_papers, config, is_hot_paper_batch=False, end_date=end_date, priority_authors=pr_authors
+                pubmed_papers, config, end_date=end_date, priority_authors=pr_authors
             )
             stats['pubmed'] = len(scored)
             all_scored.extend(scored)
@@ -1114,60 +1016,10 @@ def main():
     else:
         logger.info("Step 3: PubMed journal sweep skipped")
 
-    # ── Step 4: PubMed priority-author search ─────────────────────────────
-    if not args.skip_author_search and pr_authors:
-        logger.info("=" * 70)
-        logger.info("Step 4: PubMed author sweep (%d priority authors)", len(pr_authors))
-        logger.info("=" * 70)
 
-        author_papers = search_pubmed_by_authors(
-            authors=pr_authors,
-            start_date=start_date,
-            end_date=end_date,
-            max_results=50,
-        )
-        if author_papers:
-            stats['priority_authors'] = len(author_papers)
-            # Score with priority-author boost; add to the main pool.
-            # Store the scored list separately — after bucketing we will keep
-            # only papers that did NOT make it into the main scored buckets.
-            scored_author = filter_and_score_papers(
-                author_papers, config, is_hot_paper_batch=False, end_date=end_date, priority_authors=pr_authors
-            )
-            all_scored.extend(scored_author)
-            priority_author_papers = scored_author
-            logger.info("Priority authors: %d papers", len(author_papers))
-    else:
-        logger.info("Step 4: Priority author search skipped")
-
-    # ── Step 5: Semantic Scholar hot papers (optional) ─────────────────────
-    if args.include_hot_papers:
-        logger.info("=" * 70)
-        logger.info("Step 5: Semantic Scholar hot papers (last %d days)", args.hot_lookback_days)
-        logger.info("=" * 70)
-
-        hot_start = end_date - timedelta(days=args.hot_lookback_days)
-        hot_end   = start_date - timedelta(days=1)
-
-        hot_papers = search_hot_papers_from_categories(
-            categories=categories,
-            start_date=hot_start,
-            end_date=hot_end,
-            top_k_per_category=5,
-        )
-        if hot_papers:
-            scored = filter_and_score_papers(
-                hot_papers, config, is_hot_paper_batch=True, end_date=end_date, priority_authors=pr_authors
-            )
-            stats['semantic_scholar'] = len(scored)
-            all_scored.extend(scored)
-            logger.info("Semantic Scholar: %d scored hot papers", len(scored))
-    else:
-        logger.info("Step 5: Semantic Scholar search skipped (use --include-hot-papers to enable)")
-
-    # ── Step 6: Merge, deduplicate, bucket ────────────────────────────────
+    # ── Step 5: Merge, deduplicate, bucket ────────────────────────────────
     logger.info("=" * 70)
-    logger.info("Step 6: Merge, deduplicate, bucket")
+    logger.info("Step 5: Merge, deduplicate, bucket")
     logger.info("=" * 70)
 
     all_scored.sort(key=lambda x: x['scores']['recommendation'], reverse=True)
@@ -1178,42 +1030,27 @@ def main():
     moderate_priority = [p for p in unique if THRESHOLD_MODERATE <= p['scores']['recommendation'] < THRESHOLD_HIGH]
     low_priority      = [p for p in unique if THRESHOLD_LOW <= p['scores']['recommendation'] < THRESHOLD_MODERATE]
 
-    # Priority-author section: papers by priority authors that did NOT make it
-    # into the main scored buckets (either too low relevance or score too low
-    # even after the boost).  Papers that were boosted into the main buckets
-    # already appear there and should not be repeated here.
-    main_titles = {normalize_title(p.get('title', '')) for p in high_priority + moderate_priority + low_priority}
-    priority_author_papers = deduplicate_papers([
-        p for p in priority_author_papers
-        if normalize_title(p.get('title', '')) not in main_titles
-    ])
 
     # Within each bucket sort: PubMed first, then bioRxiv/medRxiv, then arXiv;
     # within each source group papers are ordered by score descending.
     high_priority     = sort_by_source_then_score(high_priority)
     moderate_priority = sort_by_source_then_score(moderate_priority)
     low_priority      = sort_by_source_then_score(low_priority)
-    priority_author_papers = sort_by_source_then_score(priority_author_papers)
 
     logger.info(
-        "Buckets — high: %d, moderate: %d, low: %d, priority authors: %d",
-        len(high_priority), len(moderate_priority), len(low_priority), len(priority_author_papers)
+        "Buckets — high: %d, moderate: %d, low: %d",
+        len(high_priority), len(moderate_priority), len(low_priority)
     )
 
     output = {
         'target_date': args.end,
         'date_windows': {
             'recent': {'start': args.start, 'end': args.end},
-            'hot': {
-                'start': (end_date - timedelta(days=args.hot_lookback_days)).strftime('%Y-%m-%d'),
-                'end':   (start_date - timedelta(days=1)).strftime('%Y-%m-%d'),
-            } if args.include_hot_papers else {},
         },
         'stats': stats,
-        'high_priority':          high_priority,
-        'moderate_priority':      moderate_priority,
-        'low_priority':           low_priority,
-        'priority_author_papers': priority_author_papers,
+        'high_priority':     high_priority,
+        'moderate_priority': moderate_priority,
+        'low_priority':      low_priority,
     }
 
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
@@ -1221,7 +1058,6 @@ def main():
         json.dump(output, f, ensure_ascii=False, indent=2, default=str)
 
     logger.info("Results saved to: %s", args.output)
-    print(json.dumps(output, ensure_ascii=False, indent=2, default=str))
     return 0
 
 

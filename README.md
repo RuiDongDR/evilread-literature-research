@@ -38,7 +38,18 @@ pixi install
 
 ### 2. Install the skills into Claude Code
 
-> This assumes Claude Code is installed under `~/.claude/`. If your Claude installation is elsewhere, adjust the path accordingly.
+First, find your Claude Code skills directory:
+
+```bash
+# Claude Code stores skills here by default:
+ls ~/.claude/skills/
+
+# If that path doesn't exist, find the actual Claude config directory:
+claude --version          # confirm Claude Code is installed
+ls ~/.claude/             # inspect the config root
+```
+
+Once confirmed, copy the skill:
 
 ```bash
 cp -r start-literature-research ~/.claude/skills/
@@ -48,7 +59,17 @@ Restart Claude Code after copying.
 
 ### 3. Set your Obsidian vault path
 
-Add `OBSIDIAN_VAULT_PATH` to your shell profile. Manually edit `<PATH_TO_YOUR_OBSIDIAN_VAULT>` to your actual vault path before running:
+First, find your Obsidian vault location:
+
+```bash
+# On macOS, vaults are typically under ~/Documents or ~/Library:
+ls ~/Documents/ | grep -i obsidian
+
+# Or check Obsidian's config for all known vaults:
+cat ~/Library/Application\ Support/obsidian/obsidian.json | grep -A2 '"path"'
+```
+
+Then add `OBSIDIAN_VAULT_PATH` to your shell profile, replacing `<PATH_TO_YOUR_OBSIDIAN_VAULT>` with the path you found above:
 
 ```bash
 OBSIDIAN_VAULT_PATH="<PATH_TO_YOUR_OBSIDIAN_VAULT>"
@@ -118,11 +139,6 @@ Dates are `YYYYMMDD`, both inclusive. The note is saved to:
 $OBSIDIAN_VAULT_PATH/literature_research/20260225_20260304_literature_research.md
 ```
 
-To also include Semantic Scholar high-citation papers (slower):
-
-```
-/start-literature-research --start 20260225 --end 20260304 --include-hot-papers
-```
 
 ---
 
@@ -199,17 +215,16 @@ evilread-literature-research/
 3. Search bioRxiv/medRxiv — by subject + date window
 4. Search PubMed          — target journals × keywords
 5. Search PubMed          — papers by priority authors
-[6. Optional: Semantic Scholar — high-citation papers]
          |
          v
-7. Deduplicate (DOI first, then normalized title)
-8. Score each paper
+6. Deduplicate (DOI first, then normalized title)
+7. Score each paper
          |
          v
-9. Bucket into Must-Read / High / Moderate / Low / Priority Authors
+8. Bucket into Must-Read / High / Moderate / Low / Priority Authors
          |
          v
-10. Claude writes the Obsidian note + overview paragraph
+9. Claude writes the Obsidian note + overview paragraph
 ```
 
 ---
@@ -234,33 +249,50 @@ ls config.yaml   # must exist at the repo root
 
 ---
 
-## Advanced: Run Scripts Directly
+## Run Without Claude
+
+All commands must be run from the repo root (where `pixi.toml` lives):
+
+```bash
+cd /path/to/evilread-literature-research
+OBSIDIAN_VAULT_PATH="<PATH_TO_YOUR_OBSIDIAN_VAULT>"
+START_DATE=20250611
+END_DATE=20250625
+```
+
+**Step 1 — Search papers and save results to JSON:**
+
+```bash
+pixi run python start-literature-research/scripts/search_papers.py \
+  --output /tmp/results.json \
+  --start ${START_DATE} --end ${END_DATE}
+```
+
+Optional flags for `search_papers.py` (untested):
 
 ```bash
 # arXiv + bioRxiv only, skip PubMed
 pixi run python start-literature-research/scripts/search_papers.py \
   --output /tmp/results.json \
-  --start 20260225 --end 20260304 \
+  --start ${START_DATE} --end ${END_DATE} \
   --skip-pubmed --skip-author-search
 
-# Include Semantic Scholar hot papers
-pixi run python start-literature-research/scripts/search_papers.py \
-  --output /tmp/results.json \
-  --start 20260225 --end 20260304 \
-  --include-hot-papers --hot-lookback-days 60
-
-# Use a custom config
+# Use a custom config file
 pixi run python start-literature-research/scripts/search_papers.py \
   --config /path/to/custom_config.yaml \
   --output /tmp/results.json \
-  --start 20260225 --end 20260304
+  --start ${START_DATE} --end ${END_DATE}
+```
 
-# Regenerate note from existing results JSON
+**Step 2 — Generate the Obsidian note from the JSON:**
+
+```bash
 pixi run python start-literature-research/scripts/generate_note.py \
   --input /tmp/results.json \
-  --output "$OBSIDIAN_VAULT_PATH/literature_research/20260225_20260304_literature_research.md" \
-  --start 20260225 --end 20260304
+  --output ${OBSIDIAN_VAULT_PATH}/literature_research/${START_DATE}_${END_DATE}_literature_research.md
 ```
+
+The date range is read directly from the JSON — no need to pass it again.
 
 ---
 
@@ -269,7 +301,6 @@ pixi run python start-literature-research/scripts/generate_note.py \
 - [arXiv](https://arxiv.org/) — open-access preprint platform
 - [bioRxiv](https://www.biorxiv.org/) / [medRxiv](https://www.medrxiv.org/) — life sciences preprint servers
 - [PubMed](https://pubmed.ncbi.nlm.nih.gov/) — NCBI biomedical literature database
-- [Semantic Scholar](https://www.semanticscholar.org/) — AI-powered academic research platform
 - [Claude Code](https://claude.ai/claude-code) — AI-assisted development environment
 - [Obsidian](https://obsidian.md/) — knowledge management tool
 
