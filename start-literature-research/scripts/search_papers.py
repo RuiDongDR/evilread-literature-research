@@ -470,7 +470,7 @@ def search_pubmed_recent(
     max_results: int = 100,
 ) -> List[Dict]:
     """Search PubMed by keyword + optional journal filter + date range."""
-    keyword_query = ' OR '.join([f'"{kw}"' for kw in keywords[:20]])  # PubMed URL length limit
+    keyword_query = ' OR '.join([f'"{kw}"' for kw in keywords])  # all keywords; URL stays well under limits
     # Use [EPDT] (electronic publication date) for day-precision filtering.
     # [EDAT] (Entrez/indexing date) lags the actual online publication by 2–3 days,
     # causing recently published papers to be missed in narrow date windows.

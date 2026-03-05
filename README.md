@@ -1,4 +1,4 @@
-# evil-read-arxiv
+# evilread-literature-research
 
 Automated research paper workflow — multi-source literature search, scoring, and Obsidian note generation, powered by [Claude Code](https://claude.ai/claude-code) skills.
 
@@ -17,9 +17,6 @@ Runs a literature digest across arXiv, bioRxiv/medRxiv, and PubMed for a given d
 | Skill | Command | Description |
 |-------|---------|-------------|
 | `start-literature-research` | `/start-literature-research --start YYYYMMDD --end YYYYMMDD` | Literature digest for a date range |
-| `paper-analyze` | `/paper-analyze <arXiv ID or title>` | Deep analysis of a single paper |
-| `extract-paper-images` | `/extract-paper-images <arXiv ID>` | Extract figures from a paper |
-| `paper-search` | `/paper-search "<query>"` | Search existing paper notes in your vault |
 
 ---
 
@@ -30,8 +27,8 @@ Runs a literature digest across arXiv, bioRxiv/medRxiv, and PubMed for a given d
 [pixi](https://pixi.sh) manages the Python environment:
 
 ```bash
-git clone https://github.com/your-username/evil-read-arxiv.git
-cd evil-read-arxiv
+git clone https://github.com/RuiDongDR/evilread-literature-research.git
+cd evilread-literature-research
 
 # Install pixi if you don't have it
 curl -fsSL https://pixi.sh/install.sh | bash
@@ -41,21 +38,21 @@ pixi install
 
 ### 2. Install the skills into Claude Code
 
+> This assumes Claude Code is installed under `~/.claude/`. If your Claude installation is elsewhere, adjust the path accordingly.
+
 ```bash
 cp -r start-literature-research ~/.claude/skills/
-cp -r paper-analyze ~/.claude/skills/
-cp -r extract-paper-images ~/.claude/skills/
-cp -r paper-search ~/.claude/skills/
 ```
 
 Restart Claude Code after copying.
 
 ### 3. Set your Obsidian vault path
 
-Add `OBSIDIAN_VAULT_PATH` to your shell profile:
+Add `OBSIDIAN_VAULT_PATH` to your shell profile. Manually edit `<PATH_TO_YOUR_OBSIDIAN_VAULT>` to your actual vault path before running:
 
 ```bash
-echo 'export OBSIDIAN_VAULT_PATH="/path/to/your/obsidian/vault"' >> ~/.zshrc
+OBSIDIAN_VAULT_PATH="<PATH_TO_YOUR_OBSIDIAN_VAULT>"
+echo "export OBSIDIAN_VAULT_PATH=\"$OBSIDIAN_VAULT_PATH\"" >> ~/.zshrc
 source ~/.zshrc
 ```
 
@@ -63,8 +60,10 @@ source ~/.zshrc
 
 Edit `config.yaml` in the repo root to set your vault path, research domains, target journals, and priority authors. The file is read directly by the scripts — no copying needed.
 
+Manually replace `<PATH_TO_YOUR_OBSIDIAN_VAULT>` with your actual vault path:
+
 ```yaml
-vault_path: "/path/to/your/obsidian/vault"
+vault_path: "<PATH_TO_YOUR_OBSIDIAN_VAULT>"
 
 research_domains:
   "Statistical Genetics Methods":
@@ -95,7 +94,10 @@ priority_authors:
 
 ### 5. Open Claude Code in your vault
 
+Manually set `<PATH_TO_YOUR_OBSIDIAN_VAULT>` before running (or skip the first line if you already set `OBSIDIAN_VAULT_PATH` in step 3):
+
 ```bash
+OBSIDIAN_VAULT_PATH="<PATH_TO_YOUR_OBSIDIAN_VAULT>"
 cd "$OBSIDIAN_VAULT_PATH"
 claude
 ```
@@ -120,25 +122,6 @@ To also include Semantic Scholar high-citation papers (slower):
 
 ```
 /start-literature-research --start 20260225 --end 20260304 --include-hot-papers
-```
-
-### Analyze a specific paper
-
-```
-/paper-analyze 2602.12345
-/paper-analyze "Attention Is All You Need"
-```
-
-### Extract paper figures
-
-```
-/extract-paper-images 2602.12345
-```
-
-### Search existing notes
-
-```
-/paper-search "fine-mapping eQTL"
 ```
 
 ---
@@ -189,27 +172,16 @@ Score = relevance (40%) + recency (20%) + popularity (30%) + quality (10%)
 ## Repository Structure
 
 ```
-evil-read-arxiv/
+evilread-literature-research/
 ├── README.md
 ├── pixi.toml                          # Python dependency spec
 ├── config.yaml                        # Public config template — edit this
 ├── config.local.yaml                  # (gitignored) Personal override
-├── start-literature-research/
-│   ├── skill.md                       # Claude Code skill definition
-│   └── scripts/
-│       ├── search_papers.py           # arXiv / bioRxiv / PubMed search + scoring
-│       └── generate_note.py           # Obsidian note generation
-├── paper-analyze/
-│   ├── skill.md
-│   └── scripts/
-│       ├── generate_note.py
-│       └── update_graph.py
-├── extract-paper-images/
-│   ├── skill.md
-│   └── scripts/
-│       └── extract_images.py
-└── paper-search/
-    └── skill.md
+└── start-literature-research/
+    ├── skill.md                       # Claude Code skill definition
+    └── scripts/
+        ├── search_papers.py           # arXiv / bioRxiv / PubMed search + scoring
+        └── generate_note.py           # Obsidian note generation
 ```
 
 ---
@@ -259,10 +231,6 @@ ls config.yaml   # must exist at the repo root
   ```
   /start-literature-research --start 20260225 --end 20260304 --skip-pubmed
   ```
-
-**Paper image extraction fails**
-- Confirm PyMuPDF: `pixi run python -c "import fitz; print(fitz.__version__)"`
-- Check arXiv ID format: `2602.12345` (no `arxiv:` prefix)
 
 ---
 

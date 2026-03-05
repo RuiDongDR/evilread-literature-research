@@ -113,7 +113,7 @@ end_date: {end_date}
 
 **1. {Title}**
 - **Journal/Source:** {journal or arXiv/bioRxiv/medRxiv}
-- **Year:** {year}
+- **Published:** {published_date}
 - **Authors:** {Author1}, {Author2}, {Author3}, ..., {Last Author} (corresp.)
 - **Link:** [{url}]({url})
 - **Why selected:** {which domain/keywords triggered inclusion, e.g. "GWAS + fine-mapping in Statistical Genetics Methods"}
@@ -130,7 +130,7 @@ end_date: {end_date}
 
 **1. {Title}**
 - **Journal/Source:** {source}
-- **Year:** {year}
+- **Published:** {published_date}
 - **Authors:** {Author1}, {Author2}, {Author3}, ..., {Last Author} (corresp.)
 - **Link:** [{url}]({url})
 - **Why selected:** {domain + keywords matched}
@@ -147,7 +147,7 @@ end_date: {end_date}
 
 **1. {Title}**
 - **Journal/Source:** {source}
-- **Year:** {year}
+- **Published:** {published_date}
 - **Authors:** {Author1}, {Author2}, {Author3}, ..., {Last Author} (corresp.)
 - **Link:** [{url}]({url})
 - **Why selected:** {domain + keywords matched}
@@ -164,7 +164,7 @@ end_date: {end_date}
 
 **1. {Title}**
 - **Journal/Source:** {journal}
-- **Year:** {year}
+- **Published:** {published_date}
 - **Authors:** {Author1}, {Author2}, {Author3}, ..., {Last Author} (corresp.)
 - **Link:** [{url}]({url})
 - **Why selected:** Paper by priority author: {matched author name}
@@ -193,7 +193,7 @@ end_date: {end_date}
 
 **Link format:** use the `url` field from the JSON. For arXiv, this is the abstract page (e.g., `https://arxiv.org/abs/2601.12345`). For PubMed, this is the PubMed page.
 
-**Year:** extract from `published_date` field.
+**Published:** use the `published_date` field as-is.
 
 **Overview section:** 2–4 sentences covering:
 - Main research themes represented this week
