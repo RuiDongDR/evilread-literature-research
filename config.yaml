@@ -1,0 +1,167 @@
+# evil-read-arxiv configuration
+# Edit this file to match your research interests.
+# To keep a private override (e.g. with personal author lists), create
+# config.local.yaml at the repo root — it is gitignored and takes precedence
+# when running scripts directly without --config.
+
+# Path to your Obsidian vault (required)
+vault_path: "/path/to/your/obsidian/vault"
+
+# Papers directory relative to vault (optional, default: 20_Research/Papers)
+papers_dir: "20_Research/Papers"
+
+research_domains:
+  "Target Diseases & Traits":
+    keywords:
+      low:
+        - "Alzheimer's disease"
+        - "Alzheimer"
+        - "type 2 diabetes"
+        - "T2D"
+        - "coronary artery disease"
+        - "CAD"
+        - "heart attack"
+        - "myocardial infarction"
+        - "heart failure"
+        - "insulin resistance"
+        - "stroke"
+    arxiv_categories: ["q-bio.GN", "q-bio.QM", "stat.AP"]
+    priority: 5
+
+  "Statistical Genetics Methods":
+    keywords:
+      high:
+        - "fine-mapping"
+        - "fine mapping"
+        - "causal variant"
+        - "SuSiE"
+      medium:
+        - "GWAS"
+      low:
+        - "genome-wide association"
+        - "post-GWAS"
+        - "TWAS"
+        - "PWAS"
+        - "functional genomics"
+        - "colocalization"
+        - "Mendelian randomization"
+        - "polygenic risk score"
+        - "PRS"
+        - "eQTL"
+        - "xQTL"
+    arxiv_categories: ["q-bio.GN"]
+    priority: 5
+
+  "Population Genetics & Multi-ancestry":
+    keywords:
+      low:
+        - "multi-ancestry"
+        - "multi-ethnic"
+        - "European ancestry"
+        - "Asian ancestry"
+        - "admixture"
+        - "population stratification"
+        - "trans-ethnic"
+        - "diverse populations"
+        - "genetic architecture"
+        - "linkage disequilibrium"
+        - "identity by descent"
+        - "IBD sharing"
+        - "founder population"
+        - "genetic drift"
+        - "effective population size"
+        - "haplotype"
+    arxiv_categories: ["q-bio.GN", "q-bio.PE"]
+    priority: 4
+
+  "Bayesian & Computational Methods":
+    keywords:
+      low:
+        - "Bayesian"
+        - "MCMC"
+        - "variational inference"
+        - "variable selection"
+        - "sparse regression"
+        - "causal inference"
+        - "heritability"
+        - "LD score regression"
+        - "credible set"
+        - "summary statistics"
+        - "functional annotation"
+        - "multiple testing"
+        - "false discovery rate"
+        - "false discovery"
+        - "permutation test"
+        - "mixed model"
+        - "random effects"
+    arxiv_categories: ["q-bio.QM", "q-bio.GN"]
+    priority: 3
+
+  "Single-Cell & Functional Genomics":
+    keywords:
+      low:
+        - "single-cell"
+        - "single cell"
+        - "scRNA-seq"
+        - "scATAC-seq"
+        - "cell type"
+        - "chromatin accessibility"
+        - "gene regulatory"
+        - "transcription factor"
+        - "RNA-seq"
+        - "differential expression"
+        - "cell clustering"
+        - "pseudotime"
+        - "perturbation"
+        - "CRISPR"
+        - "functional genomics"
+        - "epigenome"
+        - "epigenomic"
+        - "DNA methylation"
+        - "eQTL"
+        - "chromatin"
+        - "ATAC"
+        - "Hi-C"
+        - "spatial transcriptomics"
+        - "cell-cell interaction"
+        - "tandem repeat"
+        - "structural variant"
+    arxiv_categories: ["q-bio.GN", "q-bio.QM"]
+    priority: 4
+
+target_journals:
+  - "Nature"
+  - "Science"
+  - "Cell"
+  - "Nature Genetics"
+  - "Nature Communications"
+  - "Proceedings of the National Academy of Sciences"
+  - "Nature Reviews Genetics"
+  - "Nature Reviews Neuroscience"
+  - "Nature Reviews Cardiology"
+  - "Science Advances"
+  - "American Journal of Human Genetics"
+  - "Nature Methods"
+  - "Nature Human Behaviour"
+  - "Nature Biotechnology"
+  - "Cell Genomics"
+  - "Cell Systems"
+  - "Genome Biology"
+  - "PLoS Genetics"
+  - "PLoS Computational Biology"
+  - "Human Molecular Genetics"
+  - "Genome Research"
+  - "Bioinformatics"
+  - "Briefings in Bioinformatics"
+  - "European Journal of Human Genetics"
+  - "Genome Medicine"
+  - "npj Genomic Medicine"
+
+# Priority authors — papers by these researchers are always surfaced regardless of score.
+# Use "First Last" format.
+priority_authors:
+  - "Donald Rubin"
+  - "Gao Wang"
+  - "Xiang Zhou"
+  - "Jonathan Pritchard"
+  - "Peter Visscher"

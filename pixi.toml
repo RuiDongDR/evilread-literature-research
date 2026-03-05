@@ -1,0 +1,14 @@
+[workspace]
+name = "evil-read-arxiv"
+version = "0.1.0"
+description = "Automated research paper search, recommendation, analysis, and organization workflow"
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "osx-64", "linux-64"]
+
+[dependencies]
+python = ">=3.8"
+pyyaml = ">=6.0"
+requests = ">=2.28.0"
+
+[pypi-dependencies]
+PyMuPDF = ">=1.23.0"

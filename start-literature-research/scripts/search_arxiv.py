@@ -44,7 +44,12 @@ ARXIV_CATEGORY_KEYWORDS = {
     "cs.CV": "computer vision",
     "cs.MM": "multimedia",
     "cs.MA": "multi-agent systems",
-    "cs.RO": "robotics"
+    "cs.RO": "robotics",
+    "stat.ME": "statistical methodology genetics genomics",
+    "stat.AP": "statistical applications genetics epidemiology",
+    "stat.CO": "statistical computation genomics",
+    "q-bio.GN": "genomics genetics sequencing",
+    "q-bio.QM": "quantitative methods biology genomics",
 }
 
 # ---------------------------------------------------------------------------
@@ -59,11 +64,11 @@ RELEVANCE_TITLE_KEYWORD_BOOST = 0.5
 RELEVANCE_SUMMARY_KEYWORD_BOOST = 0.3
 RELEVANCE_CATEGORY_MATCH_BOOST = 1.0
 
-# 新近性阈值（天） -> 对应评分
+# 新近性阈值（天） -> 对应评分（weekly cadence: 7/14/30 days）
 RECENCY_THRESHOLDS = [
-    (30, 3.0),
-    (90, 2.0),
-    (180, 1.0),
+    (7,  3.0),   # within last week: top score
+    (14, 2.0),   # 1–2 weeks ago
+    (30, 1.0),   # 2–4 weeks ago
 ]
 RECENCY_DEFAULT = 0.0
 
@@ -125,32 +130,38 @@ def load_research_config(config_path: str) -> Dict:
         }
 
 
-def calculate_date_windows(target_date: Optional[datetime] = None) -> Tuple[datetime, datetime, datetime, datetime]:
+def calculate_date_windows(
+    target_date: Optional[datetime] = None,
+    recent_days: int = 7,
+    hot_lookback_days: int = 60,
+) -> Tuple[datetime, datetime, datetime, datetime]:
     """
-    计算两个时间窗口：最近30天和过去一年（除去最近30天）
-    
+    计算两个时间窗口：最近 recent_days 天（新论文）和过去 hot_lookback_days 天（热门论文）
+
     Args:
         target_date: 基准日期，如果为 None 则使用当前日期
-        
+        recent_days: 主窗口天数（新论文），默认 7 天（每周使用）
+        hot_lookback_days: 热门论文回溯天数，默认 60 天
+
     Returns:
-        (window_30d_start, window_30d_end, window_1y_start, window_1y_end)
-        - window_30d_start: 30天窗口开始日期
-        - window_30d_end: 30天窗口结束日期（即 target_date）
-        - window_1y_start: 一年窗口开始日期
-        - window_1y_end: 一年窗口结束日期（即 31天前）
+        (window_recent_start, window_recent_end, window_hot_start, window_hot_end)
+        - window_recent_start: 主窗口开始日期
+        - window_recent_end: 主窗口结束日期（即 target_date）
+        - window_hot_start: 热门窗口开始日期
+        - window_hot_end: 热门窗口结束日期（recent_days+1 天前）
     """
     if target_date is None:
         target_date = datetime.now()
-    
-    # 最近30天窗口: [target_date - 30 days, target_date]
-    window_30d_start = target_date - timedelta(days=30)
-    window_30d_end = target_date
-    
-    # 过去一年窗口（除去最近30天）: [target_date - 365 days, target_date - 31 days]
-    window_1y_start = target_date - timedelta(days=365)
-    window_1y_end = target_date - timedelta(days=31)
-    
-    return window_30d_start, window_30d_end, window_1y_start, window_1y_end
+
+    # 主窗口: [target_date - recent_days, target_date]
+    window_recent_start = target_date - timedelta(days=recent_days)
+    window_recent_end = target_date
+
+    # 热门窗口: [target_date - hot_lookback_days, target_date - (recent_days+1)]
+    window_hot_start = target_date - timedelta(days=hot_lookback_days)
+    window_hot_end = target_date - timedelta(days=recent_days + 1)
+
+    return window_recent_start, window_recent_end, window_hot_start, window_hot_end
 
 
 def search_arxiv_by_date_range(
@@ -770,8 +781,12 @@ def main():
     parser.add_argument('--target-date', type=str, default=None,
                         help='Target date (YYYY-MM-DD) for filtering')
     parser.add_argument('--categories', type=str,
-                        default='cs.AI,cs.LG,cs.CL,cs.CV,cs.MM,cs.MA,cs.RO',
+                        default='stat.ME,stat.AP,stat.CO,q-bio.GN,q-bio.QM,cs.LG',
                         help='Comma-separated list of arXiv categories')
+    parser.add_argument('--recent-days', type=int, default=7,
+                        help='Days to look back for recent papers (default: 7 for weekly use)')
+    parser.add_argument('--hot-lookback-days', type=int, default=60,
+                        help='Days to look back for hot/influential papers (default: 60)')
     parser.add_argument('--skip-hot-papers', action='store_true',
                         help='Skip searching hot papers from Semantic Scholar')
 
@@ -804,10 +819,12 @@ def main():
         target_date = datetime.now()
         logger.info("Using current date: %s", target_date.strftime('%Y-%m-%d'))
 
-    window_30d_start, window_30d_end, window_1y_start, window_1y_end = calculate_date_windows(target_date)
-    logger.info("Date windows:")
-    logger.info("  Recent 30 days: %s to %s", window_30d_start.date(), window_30d_end.date())
-    logger.info("  Past year (31-365 days): %s to %s", window_1y_start.date(), window_1y_end.date())
+    window_recent_start, window_recent_end, window_hot_start, window_hot_end = calculate_date_windows(
+        target_date, recent_days=args.recent_days, hot_lookback_days=args.hot_lookback_days
+    )
+    logger.info("Date windows (recent_days=%d, hot_lookback_days=%d):", args.recent_days, args.hot_lookback_days)
+    logger.info("  Recent papers: %s to %s", window_recent_start.date(), window_recent_end.date())
+    logger.info("  Hot papers:    %s to %s", window_hot_start.date(), window_hot_end.date())
 
     # 解析分类
     categories = args.categories.split(',')
@@ -816,15 +833,15 @@ def main():
     recent_papers = []
     hot_papers = []
 
-    # ========== 第一步：搜索最近30天的论文（arXiv）==========
+    # ========== 第一步：搜索最近 recent_days 天的论文（arXiv）==========
     logger.info("=" * 70)
-    logger.info("Step 1: Searching recent papers (last 30 days) from arXiv")
+    logger.info("Step 1: Searching recent papers (last %d days) from arXiv", args.recent_days)
     logger.info("=" * 70)
-    
+
     recent_papers = search_arxiv_by_date_range(
         categories=categories,
-        start_date=window_30d_start,
-        end_date=window_30d_end,
+        start_date=window_recent_start,
+        end_date=window_recent_end,
         max_results=args.max_results
     )
     
@@ -840,16 +857,16 @@ def main():
     else:
         logger.warning("No recent papers found")
 
-    # ========== 第二步：搜索过去一年的高影响力论文（Semantic Scholar）==========
+    # ========== 第二步：搜索过去 hot_lookback_days 天的高影响力论文（Semantic Scholar）==========
     if not args.skip_hot_papers:
         logger.info("=" * 70)
-        logger.info("Step 2: Searching hot papers (past year) from Semantic Scholar")
+        logger.info("Step 2: Searching hot papers (last %d days) from Semantic Scholar", args.hot_lookback_days)
         logger.info("=" * 70)
-        
+
         hot_papers = search_hot_papers_from_categories(
             categories=categories,
-            start_date=window_1y_start,
-            end_date=window_1y_end,
+            start_date=window_hot_start,
+            end_date=window_hot_end,
             top_k_per_category=5
         )
         
@@ -904,13 +921,13 @@ def main():
     output = {
         'target_date': args.target_date or target_date.strftime('%Y-%m-%d'),
         'date_windows': {
-            'recent_30d': {
-                'start': window_30d_start.strftime('%Y-%m-%d'),
-                'end': window_30d_end.strftime('%Y-%m-%d')
+            'recent': {
+                'start': window_recent_start.strftime('%Y-%m-%d'),
+                'end': window_recent_end.strftime('%Y-%m-%d')
             },
-            'past_year': {
-                'start': window_1y_start.strftime('%Y-%m-%d'),
-                'end': window_1y_end.strftime('%Y-%m-%d')
+            'hot': {
+                'start': window_hot_start.strftime('%Y-%m-%d'),
+                'end': window_hot_end.strftime('%Y-%m-%d')
             }
         },
         'total_recent': len(recent_papers),

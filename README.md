@@ -1,346 +1,310 @@
 # evil-read-arxiv
 
-> 邪修的论文阅读工作流 - 自动化论文搜索、推荐、分析和整理
+Automated research paper workflow — multi-source literature search, scoring, and Obsidian note generation, powered by [Claude Code](https://claude.ai/claude-code) skills.
 
-## 简介
+## What It Does
 
-这是一套 Claude Code 技能（Skills）集合，用于自动化研究论文的搜索、推荐、分析和整理工作流。通过调用 arXiv 和 Semantic Scholar API，每天为你推荐高质量论文，并自动生成详细笔记和关系图谱。
+Runs a literature digest across arXiv, bioRxiv/medRxiv, and PubMed for a given date range, scores each paper for relevance to your research interests, and saves a structured Obsidian note organized into:
 
-## 功能特点
+- **Must-Read** (score ≥ 10) — exceptional match; read these first
+- **High Priority** (7.5–9.9) — closely matching your domains and keywords
+- **Moderate Priority** (5–7.5) — relevant but lower match
+- **Lower Priority** (3–5) — tangentially related
+- **New Publications by Priority Authors** — always surfaced regardless of score
 
-### 1. start-my-day - 每日论文推荐
-- 从 arXiv 搜索最近一个月的论文
-- 从 Semantic Scholar 搜索过去一年的高热度论文
-- 基于相关性、新近性、热门度、质量四个维度综合评分
-- 自动生成今日概览和推荐列表
-- 前三篇论文自动生成详细分析和提取图片
-- 自动链接关键词到已有笔记
+## Skills Included
 
-### 2. paper-analyze - 论文深度分析
-- 深度分析单篇论文
-- 生成结构化笔记，包含：
-  - 摘要翻译和要点提炼
-  - 研究背景与动机
-  - 方法概述和架构
-  - 实验结果分析
-  - 研究价值评估
-  - 优势和局限性分析
-  - 与相关论文对比
-- 自动提取论文图片并插入笔记
-- 更新知识图谱
+| Skill | Command | Description |
+|-------|---------|-------------|
+| `start-literature-research` | `/start-literature-research --start YYYYMMDD --end YYYYMMDD` | Literature digest for a date range |
+| `paper-analyze` | `/paper-analyze <arXiv ID or title>` | Deep analysis of a single paper |
+| `extract-paper-images` | `/extract-paper-images <arXiv ID>` | Extract figures from a paper |
+| `paper-search` | `/paper-search "<query>"` | Search existing paper notes in your vault |
 
-### 3. extract-paper-images - 论文图片提取
-- 优先从 arXiv 源码包提取高质量图片
-- 支持从 PDF 提取图片作为备选
-- 自动生成图片索引
-- 保存到笔记目录的 images 子目录
+---
 
-### 4. paper-search - 论文笔记搜索
-- 在已有笔记中搜索论文
-- 支持按标题、作者、关键词、领域搜索
-- 相关性评分排序
+## Setup (macOS)
 
-## 安装
+### 1. Clone the repo and install dependencies
 
-### 前置要求
-
-1. **Claude Code CLI** - 需要安装并配置 Claude Code
-2. **Python 3.8+** - 用于运行搜索和分析脚本
-3. **依赖库**：
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-### 安装步骤
-
-1. 将此仓库克隆或复制到你的 Claude Code skills 目录：
-   ```bash
-   # Windows PowerShell
-   Copy-Item -Recurse evil-read-arxiv\start-my-day $env:USERPROFILE\.claude\skills\
-   Copy-Item -Recurse evil-read-arxiv\paper-analyze $env:USERPROFILE\.claude\skills\
-   Copy-Item -Recurse evil-read-arxiv\extract-paper-images $env:USERPROFILE\.claude\skills\
-   Copy-Item -Recurse evil-read-arxiv\paper-search $env:USERPROFILE\.claude\skills\
-
-   # macOS/Linux
-   cp -r evil-read-arxiv/start-my-day ~/.claude/skills/
-   cp -r evil-read-arxiv/paper-analyze ~/.claude/skills/
-   cp -r evil-read-arxiv/extract-paper-images ~/.claude/skills/
-   cp -r evil-read-arxiv/paper-search ~/.claude/skills/
-   ```
-
-2. 配置环境变量和路径（见下文"配置"部分）
-
-3. 重启 Claude Code CLI
-
-## 配置
-
-> **强烈建议**：先阅读 [QUICKSTART.md](QUICKSTART.md) 快速完成设置。
-
-### 步骤1：设置环境变量（推荐）
-
-所有脚本统一通过 `OBSIDIAN_VAULT_PATH` 环境变量读取 Obsidian Vault 路径，这是最简单的配置方式：
+[pixi](https://pixi.sh) manages the Python environment:
 
 ```bash
-# Windows PowerShell（临时生效）
-$env:OBSIDIAN_VAULT_PATH = "C:/Users/YourName/Documents/Obsidian Vault"
+git clone https://github.com/your-username/evil-read-arxiv.git
+cd evil-read-arxiv
 
-# Windows PowerShell（永久生效）
-[System.Environment]::SetEnvironmentVariable("OBSIDIAN_VAULT_PATH", "C:/Users/YourName/Documents/Obsidian Vault", "User")
+# Install pixi if you don't have it
+curl -fsSL https://pixi.sh/install.sh | bash
 
-# macOS/Linux（添加到 ~/.bashrc 或 ~/.zshrc）
-export OBSIDIAN_VAULT_PATH="/Users/yourname/Documents/Obsidian Vault"
+pixi install
 ```
 
-设置环境变量后，**无需修改任何脚本中的路径**。
-
-### 步骤2：创建配置文件
-
-复制 `config.example.yaml` 并修改：
+### 2. Install the skills into Claude Code
 
 ```bash
-cp config.example.yaml config.yaml
+cp -r start-literature-research ~/.claude/skills/
+cp -r paper-analyze ~/.claude/skills/
+cp -r extract-paper-images ~/.claude/skills/
+cp -r paper-search ~/.claude/skills/
 ```
 
-编辑 `config.yaml`，根据你的研究兴趣修改关键词：
+Restart Claude Code after copying.
+
+### 3. Set your Obsidian vault path
+
+Add `OBSIDIAN_VAULT_PATH` to your shell profile:
+
+```bash
+echo 'export OBSIDIAN_VAULT_PATH="/path/to/your/obsidian/vault"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+### 4. Configure your research interests
+
+Edit `config.yaml` in the repo root to set your vault path, research domains, target journals, and priority authors. The file is read directly by the scripts — no copying needed.
 
 ```yaml
 vault_path: "/path/to/your/obsidian/vault"
 
 research_domains:
-  "你的研究领域1":
+  "Statistical Genetics Methods":
     keywords:
-      - "keyword1"
-      - "keyword2"
+      high:
+        - "fine-mapping"
+        - "causal variant"
+      medium:
+        - "GWAS"
+      low:
+        - "eQTL"
+        - "polygenic risk score"
+        - "Mendelian randomization"
     arxiv_categories:
-      - "cs.AI"
-      - "cs.LG"
+      - "q-bio.GN"
+    priority: 5
+
+target_journals:
+  - "Nature Genetics"
+  - "American Journal of Human Genetics"
+
+priority_authors:
+  - "Matthew Stephens"
+  - "Peter Visscher"
 ```
 
-然后将修改后的 `config.yaml` 复制到 Vault 中：
-```bash
-cp config.yaml "$OBSIDIAN_VAULT_PATH/99_System/Config/research_interests.yaml"
-```
+**Private author lists:** If you want to keep a longer or personal author list out of git, create `config.local.yaml` at the repo root (same format as `config.yaml`). It is gitignored and takes precedence automatically when running scripts directly.
 
-### 步骤3（可选）：通过 CLI 参数覆盖路径
-
-如果不想设置环境变量，也可以在每次调用脚本时通过参数指定路径：
-
-```bash
-python scripts/search_arxiv.py --config "/your/path/research_interests.yaml"
-python scripts/scan_existing_notes.py --vault "/your/obsidian/vault"
-python scripts/generate_note.py --vault "/your/obsidian/vault" --paper-id "2402.12345" --title "Paper Title" --authors "Author" --domain "大模型"
-python scripts/update_graph.py --vault "/your/obsidian/vault" --paper-id "2402.12345" --title "Paper Title" --domain "大模型"
-```
-
-### 路径格式说明
-
-- **Windows**：可以使用正斜杠 `/` 或双反斜杠 `\\`
-  - 正确：`C:/Users/Name/Documents/Vault`
-  - 正确：`C:\\Users\\Name\\Documents\\Vault`
-  - 错误：`C:\Users\Name\Documents\Vault`（单反斜杠在 Python 字符串中需要转义）
-
-- **macOS/Linux**：使用正斜杠 `/`
-  - 正确：`/Users/name/Documents/Vault`
-
-### Obsidian 目录结构要求
-
-你的 Obsidian Vault 需要包含以下目录结构：
-
-```
-你的Vault/
-├── 10_Daily/                    # 每日推荐笔记（自动创建）
-│   └── YYYY-MM-DD论文推荐.md
-├── 20_Research/
-│   └── Papers/                  # 论文详细笔记目录
-│       ├── 大模型/
-│       │   └── 论文标题.md
-│       │       └── images/      # 论文图片
-│       ├── 多模态技术/
-│       └── 智能体/
-└── 99_System/
-    └── Config/
-        └── research_interests.yaml  # 研究兴趣配置（复制 config.yaml 到这里）
-```
-
-## 使用方法
-
-### 开始每天的论文推荐
-
-在你的 Obsidian Vault 目录下打开终端，输入：
+### 5. Open Claude Code in your vault
 
 ```bash
-start my day
+cd "$OBSIDIAN_VAULT_PATH"
+claude
 ```
 
-这会：
-1. 搜索最近一个月和过去一年的高质量论文
-2. 根据你的研究兴趣筛选和评分
-3. 生成今日推荐笔记（保存到 `10_Daily/` 目录）
-4. 对前三篇论文自动生成详细分析
-5. 提取论文图片并插入笔记
-6. 自动链接关键词到已有笔记
+---
 
-### 分析单篇论文
+## Usage
 
-如果你想深入阅读某篇论文：
+### Literature search
 
-```bash
-paper-analyze 2602.12345
-# 或使用论文标题
-paper-analyze "论文标题"
+```
+/start-literature-research --start 20260225 --end 20260304
 ```
 
-这会：
-1. 下载论文 PDF
-2. 提取图片
-3. 生成详细的分析笔记
-4. 更新知识图谱
+Dates are `YYYYMMDD`, both inclusive. The note is saved to:
 
-### 提取论文图片
-
-```bash
-extract-paper-images 2602.12345
+```
+$OBSIDIAN_VAULT_PATH/literature_research/20260225_20260304_literature_research.md
 ```
 
-### 搜索已有论文
+To also include Semantic Scholar high-citation papers (slower):
 
-```bash
-paper-search "关键词"
+```
+/start-literature-research --start 20260225 --end 20260304 --include-hot-papers
 ```
 
-## 目录结构
+### Analyze a specific paper
+
+```
+/paper-analyze 2602.12345
+/paper-analyze "Attention Is All You Need"
+```
+
+### Extract paper figures
+
+```
+/extract-paper-images 2602.12345
+```
+
+### Search existing notes
+
+```
+/paper-search "fine-mapping eQTL"
+```
+
+---
+
+## Config Reference
+
+### Research domains
+
+Each domain has:
+
+| Field | Description |
+|-------|-------------|
+| `keywords.high` | Core terms — a single title match is enough to surface the paper |
+| `keywords.medium` | Important but broader terms |
+| `keywords.low` | Supporting vocabulary — needs multiple matches to score highly |
+| `arxiv_categories` | arXiv categories to search (see table below) |
+| `priority` | 1–5, higher = stronger score boost |
+
+A flat keyword list (no tier keys) is also accepted and treated as all `low`.
+
+### Common arXiv categories
+
+| Code | Name |
+|------|------|
+| `stat.ME` | Statistics — Methodology |
+| `stat.AP` | Statistics — Applications |
+| `stat.CO` | Statistics — Computation |
+| `q-bio.GN` | Quantitative Biology — Genomics |
+| `q-bio.QM` | Quantitative Biology — Quantitative Methods |
+| `q-bio.PE` | Quantitative Biology — Populations and Evolution |
+
+### Scoring
+
+```
+Score = relevance (40%) + recency (20%) + popularity (30%) + quality (10%)
+```
+
+| Section | Score range |
+|---------|-------------|
+| Must-Read | ≥ 10 |
+| High Priority | 7.5 – 9.9 |
+| Moderate Priority | 5.0 – 7.5 |
+| Lower Priority | 3.0 – 5.0 |
+| Priority Authors | any (always included) |
+
+---
+
+## Repository Structure
 
 ```
 evil-read-arxiv/
-├── README.md                 # 本文件
-├── QUICKSTART.md             # 快速开始指南
-├── config.example.yaml       # 配置模板（需要复制并修改）
-├── requirements.txt          # Python 依赖
-├── start-my-day/             # 每日推荐技能
-│   ├── skill.md              # 技能定义文件
+├── README.md
+├── pixi.toml                          # Python dependency spec
+├── config.yaml                        # Public config template — edit this
+├── config.local.yaml                  # (gitignored) Personal override
+├── start-literature-research/
+│   ├── skill.md                       # Claude Code skill definition
 │   └── scripts/
-│       ├── search_arxiv.py   # arXiv/Semantic Scholar 搜索脚本
-│       ├── scan_existing_notes.py  # 扫描现有笔记
-│       └── link_keywords.py  # 关键词自动链接脚本
-├── paper-analyze/            # 论文分析技能
+│       ├── search_papers.py           # arXiv / bioRxiv / PubMed search + scoring
+│       └── generate_note.py           # Obsidian note generation
+├── paper-analyze/
 │   ├── skill.md
 │   └── scripts/
-│       ├── generate_note.py  # 生成笔记模板
-│       └── update_graph.py   # 更新知识图谱
-├── extract-paper-images/     # 图片提取技能
+│       ├── generate_note.py
+│       └── update_graph.py
+├── extract-paper-images/
 │   ├── skill.md
 │   └── scripts/
-│       └── extract_images.py # 图片提取脚本
-└── paper-search/             # 论文搜索技能
+│       └── extract_images.py
+└── paper-search/
     └── skill.md
 ```
 
-## 评分机制
+---
 
-论文推荐评分基于四个维度：
+## How It Works
 
-| 维度 | 权重 | 说明 |
-|------|--------|------|
-| 相关性 | 40% | 与研究兴趣的匹配程度 |
-| 新近性 | 20% | 论文发布时间 |
-| 热门度 | 30% | 引用数/影响力 |
-| 质量 | 10% | 从摘要推断的方法质量 |
+```
+/start-literature-research --start YYYYMMDD --end YYYYMMDD
+         |
+         v
+1. Load config (config.local.yaml if present, else config.yaml)
+         |
+         v
+2. Search arXiv           — by category + date window
+3. Search bioRxiv/medRxiv — by subject + date window
+4. Search PubMed          — target journals × keywords
+5. Search PubMed          — papers by priority authors
+[6. Optional: Semantic Scholar — high-citation papers]
+         |
+         v
+7. Deduplicate (DOI first, then normalized title)
+8. Score each paper
+         |
+         v
+9. Bucket into Must-Read / High / Moderate / Low / Priority Authors
+         |
+         v
+10. Claude writes the Obsidian note + overview paragraph
+```
 
-**评分细则**：
-- **相关性**：标题关键词匹配（+0.5/个）、摘要关键词匹配（+0.3/个）、类别匹配（+1.0）
-- **新近性**：30天内（+3）、30-90天（+2）、90-180天（+1）、180天以上（0）
-- **热门度**：高影响力引用 > 100（+3）、50-100（+2）、< 50（+1）
-- **质量**：多维度指标（强创新词 > 弱创新词 > 方法指标 > 量化结果 > 实验指标）
+---
 
-## 常用 arXiv 分类
+## Troubleshooting
 
-| 分类代码 | 名称 | 说明 |
-|----------|------|------|
-| cs.AI | Artificial Intelligence | 人工智能 |
-| cs.LG | Learning | 机器学习 |
-| cs.CL | Computation and Language | 计算语言学/NLP |
-| cs.CV | Computer Vision | 计算机视觉 |
-| cs.MM | Multimedia | 多媒体 |
-| cs.MA | Multiagent Systems | 多智能体系统 |
-| cs.RO | Robotics | 机器人学 |
+**Config not found**
+```bash
+ls config.yaml   # must exist at the repo root
+```
 
-## 常见问题
+**No papers returned from arXiv**
+- Broaden the date range; arXiv submission windows vary by day of week
+- Check that your `arxiv_categories` are valid codes (see table above)
 
-### Q: 搜索没有结果？
-A: 检查以下几点：
-1. 确认网络连接正常
-2. 检查配置文件中的关键词是否正确
-3. 尝试扩大搜索的 arXiv 分类范围
+**PubMed returns nothing**
+- PubMed E-utilities allows ~3 req/s without an API key; the script respects this automatically
+- Try `--skip-pubmed` to isolate the issue:
+  ```
+  /start-literature-research --start 20260225 --end 20260304 --skip-pubmed
+  ```
 
-### Q: 图片提取失败？
-A:
-1. 确保安装了 PyMuPDF：`pip install PyMuPDF`
-2. 检查 arXiv ID 格式是否正确（如 2602.12345）
+**Paper image extraction fails**
+- Confirm PyMuPDF: `pixi run python -c "import fitz; print(fitz.__version__)"`
+- Check arXiv ID format: `2602.12345` (no `arxiv:` prefix)
 
-### Q: 关键词自动链接不准确？
-A: 可以在 `start-my-day/scripts/link_keywords.py` 中修改 `COMMON_WORDS` 集合，添加你不需要自动链接的词
+---
 
-### Q: "Papers directory not found" 错误？
-A:
-1. 检查 `OBSIDIAN_VAULT_PATH` 环境变量是否正确设置
-2. 确认 Obsidian Vault 中的目录结构是否正确创建（20_Research/Papers/）
-
-### Q: "未指定 vault 路径" 错误？
-A: 设置 `OBSIDIAN_VAULT_PATH` 环境变量，或在调用脚本时通过 `--vault` / `--config` 参数指定路径。
-
-## 高级配置
-
-### 修改搜索的 arXiv 分类
-
-在调用 `search_arxiv.py` 时通过 `--categories` 参数指定：
+## Advanced: Run Scripts Directly
 
 ```bash
-python scripts/search_arxiv.py --categories "cs.AI,cs.LG,cs.CL,cs.CV"
+# arXiv + bioRxiv only, skip PubMed
+pixi run python start-literature-research/scripts/search_papers.py \
+  --output /tmp/results.json \
+  --start 20260225 --end 20260304 \
+  --skip-pubmed --skip-author-search
+
+# Include Semantic Scholar hot papers
+pixi run python start-literature-research/scripts/search_papers.py \
+  --output /tmp/results.json \
+  --start 20260225 --end 20260304 \
+  --include-hot-papers --hot-lookback-days 60
+
+# Use a custom config
+pixi run python start-literature-research/scripts/search_papers.py \
+  --config /path/to/custom_config.yaml \
+  --output /tmp/results.json \
+  --start 20260225 --end 20260304
+
+# Regenerate note from existing results JSON
+pixi run python start-literature-research/scripts/generate_note.py \
+  --input /tmp/results.json \
+  --output "$OBSIDIAN_VAULT_PATH/literature_research/20260225_20260304_literature_research.md" \
+  --start 20260225 --end 20260304
 ```
 
-### 修改每天推荐的论文数量
+---
 
-在调用 `search_arxiv.py` 时通过 `--top-n` 参数指定：
+## Acknowledgments
 
-```bash
-python scripts/search_arxiv.py --top-n 15
-```
+- [arXiv](https://arxiv.org/) — open-access preprint platform
+- [bioRxiv](https://www.biorxiv.org/) / [medRxiv](https://www.medrxiv.org/) — life sciences preprint servers
+- [PubMed](https://pubmed.ncbi.nlm.nih.gov/) — NCBI biomedical literature database
+- [Semantic Scholar](https://www.semanticscholar.org/) — AI-powered academic research platform
+- [Claude Code](https://claude.ai/claude-code) — AI-assisted development environment
+- [Obsidian](https://obsidian.md/) — knowledge management tool
 
-### 修改评分权重
-
-在 `start-my-day/scripts/search_arxiv.py` 的 `calculate_recommendation_score` 函数中调整权重。
-
-## 工作原理
-
-```
-用户输入 "start my day"
-         ↓
-    1. 加载研究配置
-    2. 扫描现有笔记构建索引
-         ↓
-    3. 搜索 arXiv（最近30天）
-    4. 搜索 Semantic Scholar（过去一年高热度）
-         ↓
-    5. 合并结果并去重
-    6. 综合评分并排序
-    7. 取前 N 篇
-         ↓
-    8. 生成今日推荐笔记
-    9. 前三篇生成详细分析
-    10. 自动链接关键词
-```
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-## 许可证
+## License
 
 MIT License
-
-## 致谢
-
-- [arXiv](https://arxiv.org/) - 开放获取的学术论文预印本平台
-- [Semantic Scholar](https://www.semanticscholar.org/) - AI 驱动的学术研究平台
-- [Claude Code](https://claude.ai/claude-code) - AI 辅助的代码和写作工具
-- [Obsidian](https://obsidian.md/) - 强大的知识管理工具

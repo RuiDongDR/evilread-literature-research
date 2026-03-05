@@ -1,0 +1,15 @@
+# Personal config override — keeps private author lists and vault paths local
+config.local.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+
+# pixi
+.pixi/
+
+# Runtime outputs
+/tmp/
+*.json
