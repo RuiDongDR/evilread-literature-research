@@ -268,14 +268,14 @@ pixi run python start-literature-research/scripts/search_papers.py \
   --start ${START_DATE} --end ${END_DATE}
 ```
 
-Optional flags for `search_papers.py` (untested):
+Optional flags for `search_papers.py`:
 
 ```bash
 # arXiv + bioRxiv only, skip PubMed
 pixi run python start-literature-research/scripts/search_papers.py \
   --output /tmp/results.json \
   --start ${START_DATE} --end ${END_DATE} \
-  --skip-pubmed --skip-author-search
+  --skip-pubmed 
 
 # Use a custom config file
 pixi run python start-literature-research/scripts/search_papers.py \
